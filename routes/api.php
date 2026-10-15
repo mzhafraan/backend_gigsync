@@ -64,6 +64,7 @@ Route::prefix('v1')->group(function () {
         // Modul Proposal
         Route::post('/jobs/{jobId}/proposals', [ProposalController::class, 'store']);
         Route::get('/jobs/{jobId}/proposals', [ProposalController::class, 'jobProposals']);
+        Route::get('/my-proposals', [ProposalController::class, 'myProposals']);
         Route::get('/proposals/my', [ProposalController::class, 'myProposals']);
         Route::put('/proposals/{id}/status', [ProposalController::class, 'updateStatus']);
 
