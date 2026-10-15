@@ -10,7 +10,28 @@ use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\WalletController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/', function () {
+    return response()->json([
+        'success' => true,
+        'message' => 'GigSync API Root',
+        'version' => 'v1',
+        'documentation' => url('/api/v1/jobs')
+    ]);
+});
+
 Route::prefix('v1')->group(function () {
+    Route::get('/', function () {
+        return response()->json([
+            'success' => true,
+            'message' => 'GigSync REST API v1 is running',
+            'endpoints' => [
+                'jobs' => url('/api/v1/jobs'),
+                'categories' => url('/api/v1/categories'),
+                'skills' => url('/api/v1/skills'),
+            ]
+        ]);
+    });
+
     // Autentikasi Publik
     Route::post('/auth/register', [AuthController::class, 'register']);
     Route::post('/auth/login', [AuthController::class, 'login']);
