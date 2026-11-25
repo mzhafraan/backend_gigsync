@@ -22,6 +22,9 @@ class ContractResource extends JsonResource
             'contractStatus' => $this->contract_status,
             'submissionNotes' => $this->submission_notes,
             'submissionUrl' => $this->submission_url,
+            'milestones' => MilestoneResource::collection(
+                $this->whenLoaded('milestones')
+            ),
             'createdAt' => $this->created_at?->toISOString(),
             'updatedAt' => $this->updated_at?->toISOString(),
         ];

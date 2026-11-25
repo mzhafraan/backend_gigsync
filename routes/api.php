@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\CategorySkillController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\ContractController;
 use App\Http\Controllers\Api\JobController;
+use App\Http\Controllers\Api\MilestoneController;
 use App\Http\Controllers\Api\ProposalController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\WalletController;
@@ -74,6 +75,39 @@ Route::prefix('v1')->group(function () {
         Route::post('/contracts/{id}/submit', [ContractController::class, 'submit']);
         Route::post('/contracts/{id}/approve', [ContractController::class, 'approve']);
         Route::post('/contracts/{id}/revise', [ContractController::class, 'revise']);
+
+
+        // Modul Milestone
+        Route::get(
+            '/contracts/{contractId}/milestones',
+            [MilestoneController::class, 'index']
+        );
+
+        Route::post(
+            '/contracts/{contractId}/milestones',
+            [MilestoneController::class, 'store']
+        );
+
+        Route::post(
+            '/milestones/{id}/start',
+            [MilestoneController::class, 'start']
+        );
+
+        Route::post(
+            '/milestones/{id}/submit',
+            [MilestoneController::class, 'submit']
+        );
+
+        Route::post(
+            '/milestones/{id}/revise',
+            [MilestoneController::class, 'revise']
+        );
+
+        Route::post(
+            '/milestones/{id}/approve',
+            [MilestoneController::class, 'approve']
+        );
+
 
         // Modul Ulasan
         Route::post('/contracts/{id}/reviews', [ReviewController::class, 'store']);

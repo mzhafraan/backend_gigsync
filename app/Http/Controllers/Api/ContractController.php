@@ -26,7 +26,7 @@ class ContractController extends Controller
             $q->where('client_id', $user->id)
               ->orWhere('freelancer_id', $user->id);
         })
-        ->with(['job', 'client', 'freelancer'])
+        ->with(['job', 'client', 'freelancer', 'milestones'])
         ->latest()
         ->get();
 
@@ -40,7 +40,12 @@ class ContractController extends Controller
     {
         $user = $request->user();
 
-        $contract = Contract::with(['job', 'client', 'freelancer'])->find($id);
+        $contract = Contract::with([
+                    'job',
+                    'client',
+                    'freelancer',
+                    'milestones',
+                ])->find($id);
         if (!$contract) {
             return $this->errorResponse('Kontrak tidak ditemukan', 404);
         }
@@ -59,13 +64,25 @@ class ContractController extends Controller
     {
         $user = $request->user();
 
-        $contract = Contract::with(['job', 'client', 'freelancer'])->find($id);
+        $contract = Contract::with([
+                'job',
+                'client',
+                'freelancer',
+                'milestones',
+            ])->find($id);
         if (!$contract) {
             return $this->errorResponse('Kontrak tidak ditemukan', 404);
         }
 
         if ($contract->freelancer_id !== $user->id) {
             return $this->errorResponse('Hanya freelancer yang ditunjuk yang dapat menyerahkan hasil kerja.', 403);
+        }
+
+        if ($contract->milestones()->exists()) {
+            return $this->errorResponse(
+                'Kontrak ini menggunakan sistem milestone. Gunakan endpoint /milestones/{id}/submit untuk menyerahkan hasil.',
+                400
+            );
         }
 
         if (!in_array($contract->contract_status, ['ACTIVE', 'REVISION'])) {
@@ -92,7 +109,12 @@ class ContractController extends Controller
         ]);
 
         return $this->successResponse(
-            new ContractResource($contract->fresh(['job', 'client', 'freelancer'])),
+            new ContractResource($contract->fresh([
+                    'job',
+                    'client',
+                    'freelancer',
+                    'milestones',
+                ])),
             'Hasil kerja berhasil diserahkan dan menunggu peninjauan dari klien.'
         );
     }
@@ -101,7 +123,12 @@ class ContractController extends Controller
     {
         $user = $request->user();
 
-        $contract = Contract::with(['job', 'client', 'freelancer'])->find($id);
+        $contract = Contract::with([
+                        'job',
+                        'client',
+                        'freelancer',
+                        'milestones',
+                    ])->find($id);
         if (!$contract) {
             return $this->errorResponse('Kontrak tidak ditemukan', 404);
         }
@@ -110,15 +137,37 @@ class ContractController extends Controller
             return $this->errorResponse('Hanya klien yang dapat menyetujui hasil kerja kontrak ini.', 403);
         }
 
-        if ($contract->contract_status === 'COMPLETED') {
-            return $this->errorResponse('Kontrak ini sudah diselesaikan sebelumnya.', 400);
+        if ($contract->milestones()->exists()) {
+            return $this->errorResponse(
+                'Kontrak ini menggunakan sistem milestone. Setujui hasil melalui endpoint /milestones/{id}/approve.',
+                400
+            );
+        }
+
+        if ($contract->contract_status !== 'UNDER_REVIEW') {
+            return $this->errorResponse(
+                'Kontrak hanya dapat disetujui ketika berstatus UNDER_REVIEW.',
+                400
+            );
+        }
+
+        if ($contract->escrow_status !== 'HELD') {
+            return $this->errorResponse(
+                'Dana escrow tidak tersedia untuk dicairkan.',
+                400
+            );
         }
 
         try {
             $this->escrowService->releaseEscrowToFreelancer($contract);
 
             return $this->successResponse(
-                new ContractResource($contract->fresh(['job', 'client', 'freelancer'])),
+                new ContractResource($contract->fresh([
+                    'job',
+                    'client',
+                    'freelancer',
+                    'milestones',
+                ])),
                 'Pekerjaan berhasil disetujui dan dana escrow telah dicairkan ke freelancer.'
             );
         } catch (\Exception $e) {
@@ -130,13 +179,25 @@ class ContractController extends Controller
     {
         $user = $request->user();
 
-        $contract = Contract::with(['job', 'client', 'freelancer'])->find($id);
+        $contract = Contract::with([
+                    'job',
+                    'client',
+                    'freelancer',
+                    'milestones',
+                ])->find($id);
         if (!$contract) {
             return $this->errorResponse('Kontrak tidak ditemukan', 404);
         }
 
         if ($contract->client_id !== $user->id) {
             return $this->errorResponse('Hanya klien yang dapat meminta revisi hasil kerja.', 403);
+
+        }
+        if ($contract->milestones()->exists()) {
+            return $this->errorResponse(
+                'Kontrak ini menggunakan sistem milestone. Gunakan endpoint /milestones/{id}/revise untuk meminta revisi.',
+                400
+            );
         }
 
         if ($contract->contract_status !== 'UNDER_REVIEW') {
@@ -156,7 +217,12 @@ class ContractController extends Controller
         ]);
 
         return $this->successResponse(
-            new ContractResource($contract->fresh(['job', 'client', 'freelancer'])),
+            new ContractResource($contract->fresh([
+            'job',
+            'client',
+            'freelancer',
+            'milestones',
+        ])),
             'Permintaan revisi berhasil dikirim ke freelancer.'
         );
     }

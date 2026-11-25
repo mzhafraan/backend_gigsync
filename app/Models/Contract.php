@@ -53,4 +53,11 @@ class Contract extends Model
     {
         return $this->hasMany(WalletTransaction::class, 'contract_id');
     }
+
+        public function milestones(): HasMany
+        {
+            return $this->hasMany(ContractMilestone::class, 'contract_id')
+                ->orderBy('sort_order')
+                ->orderBy('id');
+        }
 }
