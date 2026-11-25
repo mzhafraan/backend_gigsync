@@ -5,11 +5,8 @@ use App\Http\Controllers\Api\CategorySkillController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\ContractController;
 use App\Http\Controllers\Api\JobController;
-<<<<<<< HEAD
-use App\Http\Controllers\Api\NotificationController;
-=======
 use App\Http\Controllers\Api\MilestoneController;
->>>>>>> b7f9816967bcb710e3ac379cf25b5f2edd82caa9
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProposalController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\WalletController;
