@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ContractResource;
 use App\Http\Resources\ProposalResource;
+use App\Models\AppNotification;
 use App\Models\Job;
 use App\Models\Proposal;
 use App\Services\EscrowService;
+use App\Services\FcmService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,8 +20,10 @@ class ProposalController extends Controller
 {
     use ApiResponse;
 
-    public function __construct(private readonly EscrowService $escrowService)
-    {
+    public function __construct(
+        private readonly EscrowService $escrowService,
+        private readonly FcmService $fcmService
+    ) {
     }
 
     public function store(Request $request, string|int $jobId): JsonResponse
@@ -85,6 +89,25 @@ class ProposalController extends Controller
         ]);
 
         $proposal->load(['job', 'freelancer']);
+
+        AppNotification::create([
+            'user_id' => $job->client_id,
+            'title' => 'Pelamar Baru Masuk!',
+            'message' => "{$user->name} mengajukan proposal untuk lowongan \"{$job->title}\".",
+            'type' => 'NEW_PROPOSAL',
+            'reference_id' => $job->id,
+            'is_read' => false,
+        ]);
+
+        $this->fcmService->sendToUser(
+            $job->client_id,
+            'Pelamar Baru Masuk!',
+            "{$user->name} mengajukan proposal untuk lowongan \"{$job->title}\".",
+            [
+                'type' => 'NEW_PROPOSAL',
+                'reference_id' => $job->id,
+            ]
+        );
 
         return $this->successResponse(
             new ProposalResource($proposal),
@@ -155,10 +178,31 @@ class ProposalController extends Controller
 
         $newStatus = $request->input('status');
 
+        $clientName = $user->name ?: 'Klien';
+
         if ($newStatus === 'ACCEPTED') {
             try {
                 $contract = $this->escrowService->acceptProposalAndHoldEscrow($proposal, $user);
                 $contract->load(['job', 'client', 'freelancer']);
+
+                AppNotification::create([
+                    'user_id' => $proposal->freelancer_id,
+                    'title' => 'Selamat! Lamaran Diterima 🎉',
+                    'message' => "Proposal Anda untuk pekerjaan \"{$proposal->job->title}\" telah DITERIMA oleh \"{$clientName}\". Kontrak aktif sudah dibuat.",
+                    'type' => 'PROPOSAL_ACCEPTED',
+                    'reference_id' => $proposal->id,
+                    'is_read' => false,
+                ]);
+
+                $this->fcmService->sendToUser(
+                    $proposal->freelancer_id,
+                    'Selamat! Lamaran Diterima 🎉',
+                    "Proposal Anda untuk pekerjaan \"{$proposal->job->title}\" telah DITERIMA oleh \"{$clientName}\". Kontrak aktif sudah dibuat.",
+                    [
+                        'type' => 'PROPOSAL_ACCEPTED',
+                        'reference_id' => $proposal->id,
+                    ]
+                );
 
                 return $this->successResponse([
                     'proposal' => new ProposalResource($proposal->fresh()),
@@ -169,6 +213,25 @@ class ProposalController extends Controller
             }
         } else {
             $proposal->update(['status' => 'REJECTED']);
+
+            AppNotification::create([
+                'user_id' => $proposal->freelancer_id,
+                'title' => 'Pembaruan Status Lamaran',
+                'message' => "Maaf, proposal Anda untuk pekerjaan \"{$proposal->job->title}\" belum terpilih oleh \"{$clientName}\".",
+                'type' => 'PROPOSAL_REJECTED',
+                'reference_id' => $proposal->id,
+                'is_read' => false,
+            ]);
+
+            $this->fcmService->sendToUser(
+                $proposal->freelancer_id,
+                'Pembaruan Status Lamaran',
+                "Maaf, proposal Anda untuk pekerjaan \"{$proposal->job->title}\" belum terpilih oleh \"{$clientName}\".",
+                [
+                    'type' => 'PROPOSAL_REJECTED',
+                    'reference_id' => $proposal->id,
+                ]
+            );
 
             return $this->successResponse(
                 new ProposalResource($proposal->fresh()),

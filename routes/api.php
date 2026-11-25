@@ -5,7 +5,11 @@ use App\Http\Controllers\Api\CategorySkillController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\ContractController;
 use App\Http\Controllers\Api\JobController;
+<<<<<<< HEAD
+use App\Http\Controllers\Api\NotificationController;
+=======
 use App\Http\Controllers\Api\MilestoneController;
+>>>>>>> b7f9816967bcb710e3ac379cf25b5f2edd82caa9
 use App\Http\Controllers\Api\ProposalController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\WalletController;
@@ -55,7 +59,7 @@ Route::prefix('v1')->group(function () {
         // User & Profil
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::get('/auth/me', [AuthController::class, 'me']);
-        Route::put('/users/active-role', [AuthController::class, 'switchRole']);
+        Route::post('/auth/fcm-token', [AuthController::class, 'updateFcmToken']);
         Route::put('/users/profile', [AuthController::class, 'updateProfile']);
 
         // Modul Pekerjaan
@@ -115,6 +119,12 @@ Route::prefix('v1')->group(function () {
         // Modul Dompet
         Route::get('/wallet', [WalletController::class, 'index']);
         Route::post('/wallet/topup', [WalletController::class, 'topup']);
+
+        // Modul Notifikasi Lintas Modul
+        Route::get('/notifications', [NotificationController::class, 'index']);
+        Route::get('/notifications/unread', [NotificationController::class, 'unread']);
+        Route::put('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+        Route::put('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
 
         // Modul Obrolan (Chat)
         Route::get('/chats', [ChatController::class, 'index']);

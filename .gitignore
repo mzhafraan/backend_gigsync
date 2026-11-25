@@ -18,3 +18,5 @@ yarn-error.log
 /.idea
 /.vscode
 .env.testing
+/firebase-credentials.json
+.firebase-credentials.json

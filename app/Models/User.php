@@ -23,6 +23,7 @@ class User extends Authenticatable
         'hourly_rate',
         'avatar_url',
         'wallet_balance',
+        'fcm_token',
     ];
 
     protected $hidden = [

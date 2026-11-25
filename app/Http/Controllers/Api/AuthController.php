@@ -19,31 +19,38 @@ class AuthController extends Controller
 {
     use ApiResponse;
 
-    public function __construct(private readonly GoogleAuthService $googleAuthService)
-    {
-    }
+    public function __construct(private readonly GoogleAuthService $googleAuthService) {}
 
     public function register(Request $request): JsonResponse
     {
         $passwordConfirmation = $request->input('passwordConfirmation') ?? $request->input('password_confirmation');
-        $request->merge(['password_confirmation' => $passwordConfirmation]);
+        $activeRole = $request->input('activeRole') ?? $request->input('active_role') ?? 'FREELANCER';
+        $request->merge([
+            'password_confirmation' => $passwordConfirmation,
+            'active_role' => $activeRole,
+        ]);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:255',
+                Rule::unique('users', 'email')->where(fn ($query) => $query->where('active_role', $activeRole)),
+            ],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'activeRole' => ['nullable', 'string', Rule::in(['CLIENT', 'FREELANCER'])],
-            'active_role' => ['nullable', 'string', Rule::in(['CLIENT', 'FREELANCER'])],
+            'active_role' => ['required', 'string', Rule::in(['CLIENT', 'FREELANCER'])],
         ]);
 
-        $activeRole = $request->input('activeRole') ?? $request->input('active_role') ?? 'FREELANCER';
+        $initialBalance = $validated['active_role'] === 'CLIENT' ? 50000000.00 : 0.00;
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'active_role' => $activeRole,
-            'wallet_balance' => 0.00,
+            'active_role' => $validated['active_role'],
+            'wallet_balance' => $initialBalance,
         ]);
 
         $token = $user->createToken('android-device')->plainTextToken;
@@ -56,15 +63,22 @@ class AuthController extends Controller
 
     public function login(Request $request): JsonResponse
     {
+        $activeRole = $request->input('activeRole') ?? $request->input('active_role');
+
         $validated = $request->validate([
             'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
         ]);
 
-        $user = User::where('email', $validated['email'])->first();
+        $query = User::where('email', $validated['email']);
+        if ($activeRole && in_array($activeRole, ['CLIENT', 'FREELANCER'])) {
+            $query->where('active_role', $activeRole);
+        }
+        $user = $query->first();
 
         if (!$user || !Hash::check($validated['password'], $user->password)) {
-            return $this->errorResponse('Kredensial login tidak cocok dengan data kami.', 401);
+            $roleLabel = $activeRole ? " ({$activeRole})" : '';
+            return $this->errorResponse("Kredensial login{$roleLabel} tidak cocok dengan data kami.", 401);
         }
 
         $token = $user->createToken('android-device')->plainTextToken;
@@ -78,13 +92,14 @@ class AuthController extends Controller
     public function google(Request $request): JsonResponse
     {
         $idToken = $request->input('idToken') ?? $request->input('id_token');
+        $activeRole = $request->input('activeRole') ?? $request->input('active_role') ?? 'FREELANCER';
 
         if (!$idToken) {
             return $this->errorResponse('Parameter idToken wajib disertakan.', 422);
         }
 
         try {
-            $authData = $this->googleAuthService->authenticate($idToken);
+            $authData = $this->googleAuthService->authenticate($idToken, $activeRole);
             return $this->successResponse([
                 'token' => $authData['token'],
                 'user' => new UserResource($authData['user']),
@@ -101,25 +116,6 @@ class AuthController extends Controller
         return $this->successResponse(
             new UserResource($request->user()),
             'Data profil pengguna berhasil diambil'
-        );
-    }
-
-    public function switchRole(Request $request): JsonResponse
-    {
-        $activeRole = $request->input('activeRole') ?? $request->input('active_role');
-
-        $request->merge(['active_role' => $activeRole]);
-        $request->validate([
-            'active_role' => ['required', Rule::in(['CLIENT', 'FREELANCER'])],
-        ]);
-
-        $user = $request->user();
-        $user->active_role = $activeRole;
-        $user->save();
-
-        return $this->successResponse(
-            new UserResource($user),
-            'Peran pengguna berhasil diperbarui'
         );
     }
 
@@ -158,7 +154,7 @@ class AuthController extends Controller
             // Resize & compress image using Intervention Image
             $img = Image::read($avatarFile->getPathname());
             $img->cover(400, 400);
-            
+
             Storage::disk('public')->put($path, (string) $img->encode());
             $user->avatar_url = url(Storage::url($path));
         }
@@ -169,6 +165,24 @@ class AuthController extends Controller
             new UserResource($user),
             'Profil berhasil diperbarui'
         );
+    }
+
+    public function updateFcmToken(Request $request): JsonResponse
+    {
+        $fcmToken = $request->input('fcmToken') ?? $request->input('fcm_token');
+        $request->merge(['fcm_token' => $fcmToken]);
+
+        $request->validate([
+            'fcm_token' => ['required', 'string'],
+        ]);
+
+        $user = $request->user();
+        $user->fcm_token = $fcmToken;
+        $user->save();
+
+        return $this->successResponse([
+            'fcm_token' => $user->fcm_token,
+        ], 'FCM token berhasil diperbarui');
     }
 
     public function logout(Request $request): JsonResponse
